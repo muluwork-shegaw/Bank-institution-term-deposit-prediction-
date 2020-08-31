@@ -12,21 +12,33 @@ from matplotlib  import rcParams
 from sklearn import preprocessing 
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
-# import xgboost as xgb
+import xgboost as xgb
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import cross_val_score
 from sklearn.ensemble import AdaBoostClassifier, GradientBoostingClassifier
+from sklearn import svm
+
+from sklearn.preprocessing import OneHotEncoder,LabelEncoder
+from sklearn.preprocessing import StandardScaler,MinMaxScaler
+
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+
+
+import time
+time_start = time.time()
 
 import scipy.stats as stat
-from sklearn import svm
+
 
 from sklearn.metrics import *
 import datetime
 
 
+
 class ClassifierModeling:
-    def __init__(self,model,X_train,y_train,X_test,y_test,kfold):
+    def __init__(self,model_name,X_train=None,y_train=None,X_test=None,y_test=None,kfold=None):
         
         self.X_train = X_train
         self.X_test = X_test
@@ -34,16 +46,16 @@ class ClassifierModeling:
         self.y_test = y_test
         self.kfold =kfold
         self.y_pred = None
-        self.model_name = model
-        if model== "RandomForestClassifier":
+        self.model_name = model_name
+        if self.model_name== "RandomForestClassifier":
             self.model = RandomForestClassifier()
         elif self.model_name == "LogisticRegression":
-            self.model =LogisticRegression(solver='lbfgs')
+            self.model = LogisticRegression(solver='saga', random_state=0)
         elif self.model_name == "DecisionTreeClassifier":
             self.model = DecisionTreeClassifier()
         elif self.model_name == "XG_Boost":
-#             data_dmatrix = xgb.DMatrix(data=self.X_train,label=self.y_train)
-#             self.model = xgb.XGBClassifier()
+            data_dmatrix = xgb.DMatrix(data=self.X_train,label=self.y_train)
+            self.model = xgb.XGBClassifier()
             print()
         elif self.model_name =="Multilayer Perceptron":
             print("not implemented yet")
@@ -55,11 +67,11 @@ class ClassifierModeling:
              self.model = GradientBoostingClassifier()
         
     def fit(self):
-        print("fitting the model")
+        print("fitting the ",self.model_name)
         self.model.fit(self.X_train,self.y_train)
 
     def get_predicate(self): 
-        print("predicting the model")
+        print("predicting by ",self.model_name)
         self.y_pred = pd.Series(self.model.predict(self.X_test),name ="predict")
         return self.y_pred 
     def get_MSE(self):
@@ -71,21 +83,20 @@ class ClassifierModeling:
         return np.sqrt(mean_squared_error(self.y_test,self.y_pred))
     def validate_model(self):
         print("validate the model")
+        
         model_fit =pd.DataFrame()
-        # model_fit["prediction"] = self.y_pred
-        # model_fit["actual"] = self.y_test
         model_fit = pd.concat([self.y_pred, self.y_test], axis=1)
-
+        matrix = confusion_matrix(self.y_test, self.y_pred)
         
 
-        matrix = confusion_matrix(self.y_test, self.y_pred)
+        fig, axs = plt.subplots(1,3,squeeze=False,figsize=(15, 3))
+        plt.rcParams.update({'font.size': 10})
         d= plot_confusion_matrix(self.model, self.X_test, self.y_test,
                                              display_labels=["yes","no"],
-                                             cmap=plt.cm.Blues)
-
+                                             cmap=plt.cm.Blues,ax=axs[0,2])
+        d.ax_.set_title("{} confusion matrix".format(self.model_name))     
         total = float(len(model_fit))
-        fig, axs = plt.subplots(1,2,squeeze=False,figsize=(15, 3))
-        
+
         for ax in axs.flatten():
             plt.rcParams.update({'font.size': 16})
   
@@ -99,12 +110,11 @@ class ClassifierModeling:
                     ax .annotate(percentage, (x, y),ha='center')
         #fig.savefig("https://github.com/muluwork-shegaw/10Academy-week6/blob/master/data/{}.png".format(self.model_name))
      
-        d.ax_.set_title("{} confusion matrix".format(self.model_name))
         
         return matrix,model_fit
     def get_eff_model(self):
         if self.model_name != "svm":
-            print("calculate  model performance without k_fold")
+            print("calculate  model performance ")
             metrics = pd.DataFrame()
             metrics["model"] = [self.model_name]
             metrics["MSE"] = mean_squared_error(self.y_test,self.y_pred)
@@ -181,6 +191,57 @@ class ClassifierModeling:
         filename = now + '.pkl'
         pickle.dump(self.model, open(filename, 'wb'))
         return filename
+    '''
+        use stratified k-fold cross-validation 
+        with imbalanced datasets to preserve the 
+        class distribution in the train and test 
+        sets for each evaluation of a given model.
+        '''
+
+    def make_it_stratified(self,data,target,reduction_model='pca',dim=7,show=False):
+        X=data.drop(target,axis=1)
+        y=data[target]
+ 
+        eff =[]
+        model_pred = []
+        kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
+
+        #enumerate the splits and summarize the distributions
+        i=0
+        for train_ix, test_ix in kfold.split(X, y):
+            i =i+1
+            print("k_fold -{}   with {} model".format(i,self.model_name))
+
+            if reduction_model =='pca': # using PCA
+                pca = PCA(n_components=7)
+                reduced_df = pca.fit_transform( X) # reduce the dimention and convert to data frame
+                      # columns=[f'pca {i}'  for i in range(1,8)]) 
+              
+            elif reduction_model =='tsne':# using TSNE
+                tsne = TSNE(n_components = 7, n_iter = 300)
+     
+            # select rows
+            self.X_train,self.X_test = reduced_df[train_ix], reduced_df[test_ix]
+            self.y_train, self.y_test = y[train_ix], y[test_ix]
+
+            self.fit()
+            self.get_predicate()
+            if show == True:
+                matrix,model_fit=self.validate_model()
+                model_pred.append(model_fit)
+            eff.append(self.get_eff_model())    
+
+            
+        df_eff = pd.concat(eff)
+
+        df_eff =pd.DataFrame(df_eff.mean()).transpose()
+        df_eff.index=[self.model_name]
+
+        return df_eff,model_pred
+            
+        
+            
+
             
         
 

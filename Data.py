@@ -193,26 +193,8 @@ class PreProcessor:
         print("\nspliting the data as train and test")
         X=data.drop(target,axis=1)
         y=data[target]
-        from sklearn.datasets import make_classification
-        # X, y = make_classification(n_samples=1000, n_classes=2, weights=[0.99, 0.01], flip_y=0, random_state=1)
-
-
-        # '''
-        # use stratified k-fold cross-validation 
-        # with imbalanced datasets to preserve the class distribution in the train and test 
-        # sets for each evaluation of a given model.
-        # '''
-        # kfold = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
-        # # enumerate the splits and summarize the distributions
-        # for train_ix, test_ix in kfold.split(X, y):
-        #     # select rows
-        #     X_train, X_test = X[train_ix], X[test_ix]
-        #     y_train, y_test = y[train_ix], y[test_ix]
-        #     # summarize train and test composition
-        #     train_0, train_1 = len(y_train[y_train==0]), len(y_train[y_train==1])
-        #     test_0, test_1 = len(y_test[y_test==0]), len(y_test[y_test==1])
-        #     print('>Train: 0=%d, 1=%d, Test: 0=%d, 1=%d' % (train_0, train_1, test_0, test_1))
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1,stratify =y,random_state=1)#use stratified kfold distribution for imbalanced class distributin
+        
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1,stratify =y,random_state=1)#use stratified distribution for imbalanced class distributin
         return X_train, X_test, y_train, y_test
                    
     def pipe_and_filter(self):# this function is to pipe earlier steps

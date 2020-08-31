@@ -32,8 +32,24 @@ y_test = split_result[3]
 k_fold = StratifiedKFold(n_splits=5, shuffle=True, random_state=1)
 
 classifiers =["RandomForestClassifier","LogisticRegression","DecisionTreeClassifier",
-              "svm","adboost","gradienBoost"]
+             "adboost","gradienBoost"]
+print("---------------------------with startified k_fold distribution-----------------------------")
 
+eff =[]
+model_pred = []
+for model_classifier in classifiers:
+    classifier = ClassifierModeling(model_classifier)
+
+    df_eff,model_pred = classifier.make_it_stratified(data=scaled_data,target="y")
+    eff.append(df_eff)
+    model_pred.append(model_pred)
+print("\n-----------------model performance with stratified k_fold------------------")
+df = pd.concat(eff)
+print(df)
+
+print("---------------------------with out k_fold distribution-----------------------------")
+classifiers =["RandomForestClassifier","LogisticRegression","DecisionTreeClassifier",
+              "svm","adboost","gradienBoost"]
 model =[]
 eff_kfold =[]
 eff =[]
@@ -55,8 +71,7 @@ for model_classifier in classifiers:
 
     
 df_kfold =pd.concat(eff_kfold)
-print("\n-----------------model performance with stratified k_fold------------------")
-print(df_kfold)
+
 
 df = pd.concat(eff)
 print("\n-----------------model performance with out stratified k_fold------------------")
@@ -65,3 +80,7 @@ print(df)
 
 print("\n-------------confusion matrix---------")
 print(confu_matrix)
+
+
+
+
